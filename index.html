@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Language Mapping</title>
+    <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' rel='stylesheet' />
+    <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
+    <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script>
+
+    <script id="region-data" type="application/json">
+        {
+        "Asia": {
+            "Southern Asia": "#c8c5df",
+            "Southeastern Asia": "#d2d0e3",
+            "Central Asia": "#e6e6ed",
+            "Western Asia": "#bebada",
+            "Eastern Asia": "#dcdbe8"
+        },
+        "Africa": {
+            "Western Africa": "#8dd3c7",
+            "Southern Africa": "#a0d9cf",
+            "Middle Africa": "#c6e5e0",
+            "Northern Africa": "#b3dfd8",
+            "Eastern Africa": "#d9ece8"
+        },
+        "Europe": {
+            "Southern Europe": "#f99e94",
+            "Eastern Europe": "#f4dad7",
+            "Northern Europe": "#f7bcb5",
+            "Western Europe": "#fb8072"
+        },
+        "Oceania": {
+            "Melanesia": "#bcd3e3",
+            "Micronesia": "#9ec2db",
+            "Australia and New Zealand": "#d9e4ec",
+            "Polynesia": "#80b1d3"
+        },
+        "Americas": {
+            "Central America": "#f8f8ca",
+            "Caribbean": "#f5f5d5",
+            "Northern America": "#fcfcbe",
+            "South America": "#ffffb3"
+        }
+        }
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Mono', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #dcdcdc;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 20px;
+            top: 175px;
+            width: 600px;
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 9999;
+            height: 90vh;
+            padding-bottom: 20px;
+        }
+
+        .sidebar h1 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #ecf0f1;
+        }
+
+        .legend {
+            margin-top: 20px;
+            padding-top: 20px;
+            display: flex;
+            gap: 20px;
+            position: fixed;
+            top: 0;
+            left: 20px;
+            z-index: 9999;
+        }
+
+        .column {
+            flex: 1;
+        }
+
+        .legend h3 {
+            font-size: 1em;
+            margin-bottom: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        .language-list {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #000;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .tooltip {
+            font-family: 'IBM Plex Mono', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: auto;
+            background-color: rgba(249, 255, 243, 1.0);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .population-bar {
+            height: 15px;
+            margin-right: 10px;
+            border: 1px solid #34495e;
+            position: relative;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #34495e;
+        }
+
+        #population-chart {
+            width: 100%;
+            height: 400px;
+        }
+
+        .circle-container {
+            display: flex;
+            justify-content: center;
+            height: 25px;
+            align-items: center;
+        }
+
+        .circle {
+            border-radius: 50%;
+            border-color: #000;
+            border-width: 1px;
+            border-style: solid;
+        }
+
+        .maplibregl-popup-content {
+            font-family: 'IBM Plex Mono', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: rgba(249, 255, 243, 1.0);
+            padding: 10px;
+        }
+
+        .maplibregl-ctrl-bottom-right {
+            bottom: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="legend" id="legend">
+        </div>
+
+        <div class="sidebar">
+            <div class="language-list">
+                <div id="population-chart"></div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="loading" id="loading">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize MapLibre GL JS map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {},
+                layers: [
+                    {
+                        id: 'background',
+                        type: 'background',
+                        paint: {
+                            'background-color': '#dcdcdc'
+                        }
+                    }
+                ],
+                // glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
+            },
+            center: [-74.0060, 40.7128],
+            zoom: 10,
+            attributionControl: false
+        });
+
+        // Add zoom controls
+        map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+
+        let regionColors = {};
+        let languagePoints = [];
+        let selectedLanguage = null;
+        let selectedRegion = null;
+        const neighborhoodData = new Map();
+        const langMap = new Map();
+
+        const BACKGROUND_COLOR = "#767676";
+
+        const regions = JSON.parse(document.getElementById("region-data").textContent);
+
+        function clearLanguagePoints() {
+            if (map.getLayer('language-circles')) {
+                map.removeLayer('language-circles');
+            }
+            if (map.getSource('language-circles')) {
+                map.removeSource('language-circles');
+            }
+        }
+
+        function chooseColor(colors, weights) {
+            const cumulativeWeights = [];
+            let sum = 0;
+
+            for (let i = 0; i < weights.length; i += 1) {
+                sum += weights[i];
+                cumulativeWeights.push(sum);
+            }
+
+            const r = Math.random();
+            for (let i = 0; i < weights.length; i += 1) {
+                if (r < cumulativeWeights[i]) {
+                    return colors[i];
+                }
+            }
+        }
+
+        function populationToStr(p) {
+            if (p > 1000000) {
+                return `${+(p / 1000000).toFixed(2)}M`;
+            } else if (p > 10000) {
+                return `${+(p / 1000).toFixed(2)}K`;
+            } else {
+                return p;
+            }
+        }
+
+        const sizeMap = {
+            'Largest': 25,
+            'Large': 20,
+            'Medium': 15,
+            'Small': 10,
+            'Smallest': 5
+        };
+        const radiusMap = {
+            'Largest': 16,
+            'Large': 12,
+            'Medium': 8,
+            'Small': 4,
+            'Smallest': 2
+        };
+
+        function buildCircleDiv(s, color) {
+            const circle = document.createElement('div');
+            circle.className = 'circle';
+            circle.style.backgroundColor = color;
+            circle.style.width = `${sizeMap[s]}px`;
+            circle.style.height = `${sizeMap[s]}px`;
+
+            const circleContainer = document.createElement('div');
+            circleContainer.className = 'circle-container';
+            circleContainer.appendChild(circle);
+
+            return circleContainer.outerHTML;
+        }
+
+        function buildLangSection(neighborhood, langs) {
+            const t = document.createElement('div');
+
+            const header = document.createElement('h3');
+            header.innerText = neighborhood;
+            header.style.textAlign = 'center';
+            t.appendChild(header);
+
+            const table = document.createElement('table');
+            const tHeader = table.createTHead();
+            const tRow = tHeader.insertRow();
+
+            let th = document.createElement('th');
+            th.innerHTML = 'Language';
+            tRow.appendChild(th);
+
+            th = document.createElement('th');
+            th.innerHTML = 'Local';
+            tRow.appendChild(th);
+
+            th = document.createElement('th');
+            th.innerHTML = 'Global';
+            tRow.appendChild(th);
+
+            th = document.createElement('th');
+            th.innerHTML = 'Family';
+            tRow.appendChild(th);
+
+            t.appendChild(table);
+
+            langs.sort((a, b) => {
+                return sizeMap[b.Size] - sizeMap[a.Size];
+            });
+
+            const tbody = document.createElement('tbody');
+            tbody.id = 'language-list';
+            table.appendChild(tbody);
+            langs.forEach(l => {
+                const row = tbody.insertRow();
+                console.log(l);
+
+                const color = regionColors[l._4];
+                const circle = buildCircleDiv(l.Size, color);
+                const popStr = populationToStr(l._2);
+
+                const lang = `${l.Endonym} (${l.Language})`;
+
+                const rowData = [lang, circle, popStr, l._6];
+                rowData.forEach(d => {
+                    const cell = row.insertCell();
+                    cell.innerHTML = d;
+                });
+
+                row.dataset.language = l.Language;
+                row.dataset.color = color;
+            });
+            document.getElementById('population-chart').innerHTML = t.outerHTML;
+
+            document.getElementById('population-chart').addEventListener('click', function (event) {
+                const clickedRow = event.target.closest('tr');
+
+                if (clickedRow && clickedRow.dataset.language) {
+                    for (const r of document.getElementById('language-list').rows) {
+                        r.style.fontWeight = 'normal';
+                    }
+
+                    clearLanguagePoints();
+
+                    clickedRow.style.fontWeight = 'bold';
+                    selectedLanguage = clickedRow.dataset.language;
+
+                    // Dim all points
+                    if (map.getLayer('language-points')) {
+                        map.setPaintProperty('language-points', 'fill-opacity', 0.1);
+                    }
+
+                    // Dim neighborhood fills
+                    if (map.getLayer('neighborhood-fills')) {
+                        map.setPaintProperty('neighborhood-fills', 'fill-opacity', 0);
+                        map.setPaintProperty('neighborhood-fills', 'fill-color', BACKGROUND_COLOR);
+                    }
+
+                    // Show circles for selected language
+                    const languageLocations = langMap.get(clickedRow.dataset.language) || [];
+                    const features = languageLocations.map(([neighborhood, size]) => {
+                        const nData = neighborhoodData.get(neighborhood);
+                        if (!nData || !nData.center) return null;
+
+                        return {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Point',
+                                coordinates: nData.center
+                            },
+                            properties: {
+                                size: radiusMap[size],
+                                color: clickedRow.dataset.color
+                            }
+                        };
+                    }).filter(f => f !== null);
+
+                    if (features.length > 0) {
+                        map.addSource('language-circles', {
+                            type: 'geojson',
+                            data: {
+                                type: 'FeatureCollection',
+                                features: features
+                            }
+                        });
+
+                        map.addLayer({
+                            id: 'language-circles',
+                            type: 'circle',
+                            source: 'language-circles',
+                            paint: {
+                                'circle-radius': {
+                                    type: 'identity',
+                                    property: 'size'
+                                },
+                                'circle-color': ['get', 'color'],
+                                'circle-opacity': 1,
+                                'circle-stroke-color': '#000',
+                                'circle-stroke-width': 0.6
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        function processNeighborhoodPoints(n) {
+            const colors = n.colors;
+            if (Object.keys(colors).length === 0) {
+                return { features: [], dominantColor: BACKGROUND_COLOR };
+            }
+
+            const colorsJson = JSON.parse(colors);
+            const geojson = JSON.parse(n.points);
+            const features = (geojson.type === 'FeatureCollection' && geojson.features) ?
+                geojson.features : (geojson.type === 'Feature' ? [geojson] : []);
+
+            const keys = Object.keys(colorsJson);
+            const values = Object.values(colorsJson);
+
+            features.forEach(function (f) {
+                if (!f.properties) f.properties = {};
+                f.properties.color = chooseColor(keys, values);
+            });
+
+            const dominantColor = Object.entries(colorsJson).sort((a, b) => b[1] - a[1])[0][0];
+            return { features, dominantColor };
+        }
+
+        // Load map data
+        async function loadMapData(neighborhood = '') {
+            document.getElementById('loading').style.display = 'block';
+
+            const timeStart = Date.now();
+            let dataLoadTime = 0;
+
+            try {
+                const beforeDataTime = Date.now();
+                const response = await fetch('data.json')
+                const data = await response.json();
+                const neighborhoods = data['map-data'];
+                const afterDataTime = Date.now();
+
+                dataLoadTime = afterDataTime - beforeDataTime;
+
+                // Load NYC boundary
+                // const nycResponse = await fetch('/api/nyc-boundary');
+                // const nycData = await nycResponse.json();
+                const nycData = data['nyc-boundary'];
+
+                const neighborhoodFillFeatures = [];
+                const neighborhoodBorderFeatures = [];
+                const allPointFeatures = [];
+
+                neighborhoods.forEach(n => {
+                    try {
+                        const bbGeo = JSON.parse(n.bb)['features'][0]['geometry'];
+                        const pointsResult = processNeighborhoodPoints(n);
+
+                        // Store neighborhood data
+                        let center = null;
+                        console.log(bbGeo);
+                        if (bbGeo.type === 'Polygon') {
+                            const coords = bbGeo.coordinates[0];
+                            const lngs = coords.map(c => c[0]);
+                            const lats = coords.map(c => c[1]);
+                            center = [
+                                (Math.min(...lngs) + Math.max(...lngs)) / 2,
+                                (Math.min(...lats) + Math.max(...lats)) / 2
+                            ];
+                        }
+
+                        neighborhoodData.set(n.name, {
+                            geometry: bbGeo,
+                            langs: n.langs,
+                            dominantColor: pointsResult.dominantColor,
+                            center: center
+                        });
+
+                        // Add to language map
+                        n.langs.forEach(l => {
+                            if (!langMap.has(l.Language)) {
+                                langMap.set(l.Language, []);
+                            }
+                            const nlist = langMap.get(l.Language);
+                            nlist.push([n.name, l.Size]);
+                        });
+
+                        // Neighborhood fill
+                        neighborhoodFillFeatures.push({
+                            type: 'Feature',
+                            geometry: bbGeo,
+                            properties: {
+                                name: n.name,
+                                color: pointsResult.dominantColor
+                            }
+                        });
+
+                        // Neighborhood border
+                        neighborhoodBorderFeatures.push({
+                            type: 'Feature',
+                            geometry: bbGeo,
+                            properties: {
+                                name: n.name
+                            }
+                        });
+
+                        // Add language points
+                        allPointFeatures.push(...pointsResult.features);
+
+                    } catch (e) {
+                        console.error('Error processing neighborhood:', n.name, e);
+                    }
+                });
+
+                // Ensure map is ready before adding sources
+                const addLayers = () => {
+                    // Add neighborhood fills
+                    map.addSource('neighborhood-fills', {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: neighborhoodFillFeatures
+                        }
+                    });
+
+                    map.addLayer({
+                        id: 'neighborhood-fills',
+                        type: 'fill',
+                        source: 'neighborhood-fills',
+                        paint: {
+                            'fill-color': ['get', 'color'],
+                            'fill-opacity': 1
+                        }
+                    });
+
+                    // Add neighborhood borders
+                    map.addSource('neighborhood-borders', {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: neighborhoodBorderFeatures
+                        }
+                    });
+
+                    map.addLayer({
+                        id: 'neighborhood-borders',
+                        type: 'line',
+                        source: 'neighborhood-borders',
+                        paint: {
+                            'line-color': '#000',
+                            'line-width': 1
+                        }
+                    });
+
+                    // Add language points
+                    map.addSource('language-points', {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: allPointFeatures
+                        }
+                    });
+
+                    map.addLayer({
+                        id: 'language-points',
+                        type: 'fill',
+                        source: 'language-points',
+                        paint: {
+                            'fill-color': ['get', 'color'],
+                            'fill-opacity': 1
+                        }
+                    });
+
+                    // Add click handler for neighborhoods
+                    map.on('click', 'neighborhood-fills', (e) => {
+                        const name = e.features[0].properties.name;
+                        const nData = neighborhoodData.get(name);
+                        if (nData) {
+                            buildLangSection(name, nData.langs);
+                        }
+                    });
+
+                    // Add hover cursor
+                    map.on('mouseenter', 'neighborhood-fills', () => {
+                        map.getCanvas().style.cursor = 'pointer';
+                    });
+
+                    map.on('mouseleave', 'neighborhood-fills', () => {
+                        map.getCanvas().style.cursor = '';
+                    });
+
+                    // Add hover tooltip
+                    const popup = new maplibregl.Popup({
+                        closeButton: false,
+                        closeOnClick: false
+                    });
+
+                    map.on('mousemove', 'neighborhood-fills', (e) => {
+                        const name = e.features[0].properties.name;
+                        popup.setLngLat(e.lngLat)
+                            .setHTML(`<div class="tooltip">${name}</div>`)
+                            .addTo(map);
+                    });
+
+                    map.on('mouseleave', 'neighborhood-fills', () => {
+                        popup.remove();
+                    });
+
+                    document.getElementById('loading').style.display = 'none';
+                    const timeEnd = Date.now();
+                    const totalTime = timeEnd - timeStart;
+                    console.log("Loaded map in " + totalTime + " ms (" + dataLoadTime + " ms to load data)");
+                    console.log("Using MapLibre GL JS (WebGL renderer)");
+                    console.log("Total features: " + (neighborhoodFillFeatures.length + allPointFeatures.length));
+                };
+
+                // Call addLayers when map style is loaded
+                if (map.isStyleLoaded()) {
+                    addLayers();
+                } else {
+                    map.once('load', addLayers);
+                }
+
+            } catch (error) {
+                console.error('Error loading map data:', error);
+                alert('Error loading map data. Please try again.');
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Update legend
+        async function updateLegend() {
+            // const response = await fetch(`/api/regions`);
+            // const regions = await response.json();
+
+            const legendDiv = document.getElementById('legend');
+
+            const sortedMajorRegions = Object.keys(regions).sort();
+            sortedMajorRegions.forEach(majorRegion => {
+                const majorRegionDiv = document.createElement('div');
+                const sortedRegions = Object.keys(regions[majorRegion]).sort();
+                sortedRegions.forEach(region => {
+                    let color = regions[majorRegion][region];
+                    regionColors[region] = color;
+
+                    const item = document.createElement('div');
+                    item.className = 'legend-item';
+
+                    const colorBox = document.createElement('div');
+                    colorBox.className = 'legend-color';
+                    colorBox.style.backgroundColor = color;
+                    item.appendChild(colorBox);
+
+                    const textLabel = document.createElement('div');
+                    textLabel.innerHTML = region;
+                    textLabel.className = 'legend-text';
+                    item.appendChild(textLabel);
+
+                    item.dataset.color = color;
+                    item.dataset.toggled = false;
+                    item.dataset.region = region;
+
+                    majorRegionDiv.appendChild(item);
+
+                    item.addEventListener('click', function () {
+                        const toggled = !(JSON.parse(this.dataset.toggled));
+                        this.dataset.toggled = toggled;
+
+                        document.querySelectorAll('.legend-color').forEach(d => {
+                            d.style.borderWidth = "1px";
+                        });
+                        document.querySelectorAll('.legend-text').forEach(d => {
+                            d.innerHTML = `${d.parentNode.dataset.region}`;
+                        });
+
+                        if (toggled) {
+                            item.querySelector('.legend-color').style.borderWidth = "3px";
+                            item.querySelector('.legend-text').innerHTML = `<b>${this.dataset.region}</b>`;
+                            selectedRegion = this.dataset.color;
+                        } else {
+                            item.querySelector('.legend-color').style.borderWidth = "1px";
+                            item.querySelector('.legend-text').innerHTML = `${this.dataset.region}`;
+                            selectedRegion = null;
+                        }
+
+                        // Filter points by selected region
+                        if (map.getLayer('language-points')) {
+                            if (toggled) {
+                                map.setFilter('language-points', ['==', ['get', 'color'], this.dataset.color]);
+                                map.setPaintProperty('language-points', 'fill-opacity', 1);
+
+                                // Update neighborhood fills to background color
+                                map.setPaintProperty('neighborhood-fills', 'fill-color', BACKGROUND_COLOR);
+                            } else {
+                                map.setFilter('language-points', null);
+                                map.setPaintProperty('language-points', 'fill-opacity', 1);
+
+                                // Restore neighborhood colors
+                                map.setPaintProperty('neighborhood-fills', 'fill-color', ['get', 'color']);
+                            }
+                        }
+                    });
+                });
+
+                legendDiv.appendChild(majorRegionDiv);
+            });
+        }
+
+        // Initial load
+        loadMapData('');
+        updateLegend();
+    </script>
+</body>
+
+</html>
