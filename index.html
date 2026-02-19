@@ -326,7 +326,6 @@
                         }
                     }
                 ],
-                // glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
             },
             center: [-74.0060, 40.7128],
             zoom: 10.5,
@@ -467,6 +466,7 @@
 
                 row.dataset.language = l.Language;
                 row.dataset.color = color;
+                row.dataset.toggled = false;
             });
             document.getElementById('population-chart').innerHTML = t.outerHTML;
 
@@ -478,66 +478,9 @@
                         r.style.fontWeight = 'normal';
                     }
 
-                    clearLanguagePoints();
+                    clickedRow.dataset.toggled = !(JSON.parse(clickedRow.dataset.toggled));
 
-                    clickedRow.style.fontWeight = 'bold';
-                    selectedLanguage = clickedRow.dataset.language;
-
-                    // Dim all points
-                    if (map.getLayer('language-points')) {
-                        map.setPaintProperty('language-points', 'fill-opacity', 0.1);
-                    }
-
-                    // Dim neighborhood fills
-                    if (map.getLayer('neighborhood-fills')) {
-                        map.setPaintProperty('neighborhood-fills', 'fill-opacity', 0);
-                        map.setPaintProperty('neighborhood-fills', 'fill-color', BACKGROUND_COLOR);
-                    }
-
-                    // Show circles for selected language
-                    const languageLocations = langMap.get(clickedRow.dataset.language) || [];
-                    const features = languageLocations.map(([neighborhood, size]) => {
-                        const nData = neighborhoodData.get(neighborhood);
-                        if (!nData || !nData.center) return null;
-
-                        return {
-                            type: 'Feature',
-                            geometry: {
-                                type: 'Point',
-                                coordinates: nData.center
-                            },
-                            properties: {
-                                size: radiusMap[size],
-                                color: clickedRow.dataset.color
-                            }
-                        };
-                    }).filter(f => f !== null);
-
-                    if (features.length > 0) {
-                        map.addSource('language-circles', {
-                            type: 'geojson',
-                            data: {
-                                type: 'FeatureCollection',
-                                features: features
-                            }
-                        });
-
-                        map.addLayer({
-                            id: 'language-circles',
-                            type: 'circle',
-                            source: 'language-circles',
-                            paint: {
-                                'circle-radius': {
-                                    type: 'identity',
-                                    property: 'size'
-                                },
-                                'circle-color': ['get', 'color'],
-                                'circle-opacity': 1,
-                                'circle-stroke-color': '#000',
-                                'circle-stroke-width': 0.6
-                            }
-                        });
-                    }
+                    highlightPoints();
                 }
             });
         }
@@ -805,52 +748,109 @@
                         const toggled = !(JSON.parse(this.dataset.toggled));
                         this.dataset.toggled = toggled;
 
-                        document.querySelectorAll('.legend-color').forEach(d => {
-                            d.style.borderWidth = "1px";
-                        });
-                        document.querySelectorAll('.legend-text').forEach(d => {
-                            d.innerHTML = `${d.parentNode.dataset.region}`;
-                        });
-
-                        const legendItems = document.getElementsByClassName("legend-item");
-                        let itemToggled = false;
-                        for (const item of legendItems) {
-                            if (item.dataset.toggled) {
-                                itemToggled = true;
-                            }
-                        }
-
-                        if (toggled) {
-                            item.querySelector('.legend-color').style.borderWidth = "3px";
-                            item.querySelector('.legend-text').innerHTML = `<b>${this.dataset.region}</b>`;
-                            selectedRegion = this.dataset.color;
-                        } else {
-                            item.querySelector('.legend-color').style.borderWidth = "1px";
-                            item.querySelector('.legend-text').innerHTML = `${this.dataset.region}`;
-                            selectedRegion = null;
-                        }
-
-                        // Filter points by selected region
-                        if (map.getLayer('language-points')) {
-                            if (toggled) {
-                                map.setFilter('language-points', ['==', ['get', 'color'], this.dataset.color]);
-                                map.setPaintProperty('language-points', 'fill-opacity', 1);
-
-                                // Update neighborhood fills to background color
-                                map.setPaintProperty('neighborhood-fills', 'fill-color', BACKGROUND_COLOR);
-                            } else {
-                                map.setFilter('language-points', null);
-                                map.setPaintProperty('language-points', 'fill-opacity', 1);
-
-                                // Restore neighborhood colors
-                                map.setPaintProperty('neighborhood-fills', 'fill-color', ['get', 'color']);
-                            }
-                        }
+                        // resetMap();
+                        highlightPoints();
                     });
                 });
 
                 legendDiv.appendChild(majorRegionDiv);
             });
+        }
+
+        function highlightPoints() {
+            clearLanguagePoints();
+
+            const legendItems = document.getElementsByClassName("legend-item");
+            let regionSelected = false;
+            let toggledColors = [];
+            for (const item of legendItems) {
+                if (JSON.parse(item.dataset.toggled)) {
+                    regionSelected = true;
+
+                    toggledColors.push(item.dataset.color);
+
+                    item.querySelector('.legend-color').style.borderWidth = "3px";
+                    item.querySelector('.legend-text').innerHTML = `<b>${item.dataset.region}</b>`;
+                } else {
+                    item.querySelector('.legend-color').style.borderWidth = "1px";
+                    item.querySelector('.legend-text').innerHTML = `${item.dataset.region}`;
+                }
+            }
+
+            let langSelected = false;
+            const langRows = document.getElementById('language-list');
+            let features = [];
+            if (langRows !== null) {
+                for (const r of document.getElementById('language-list').rows) {
+                    if (JSON.parse(r.dataset.toggled)) {
+                        langSelected = true;
+
+                        r.style.fontWeight = 'bold';
+
+                        features.push(...getLangCircleFeatures(r));
+                    } else {
+                        r.style.fontWeight = 'normal';
+                    }
+                }
+            }
+
+            if (features.length > 0) {
+                map.addSource('language-circles', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: features
+                    }
+                });
+
+                map.addLayer({
+                    id: 'language-circles',
+                    type: 'circle',
+                    source: 'language-circles',
+                    paint: {
+                        'circle-radius': {
+                            type: 'identity',
+                            property: 'size'
+                        },
+                        'circle-color': ['get', 'color'],
+                        'circle-opacity': 1,
+                        'circle-stroke-color': '#000',
+                        'circle-stroke-width': 0.6
+                    }
+                });
+            }
+
+            if (regionSelected || langSelected) {
+                map.setFilter('language-points', ['in', ['get', 'color'], ["literal", toggledColors]]);
+                map.setPaintProperty('neighborhood-fills', 'fill-color', BACKGROUND_COLOR);
+            } else {
+                // Nothing selected, reset the map to full color
+                map.setFilter('language-points', null);
+                map.setPaintProperty('neighborhood-fills', 'fill-color', ['get', 'color']);
+            }
+
+        }
+
+        function getLangCircleFeatures(clickedRow) {
+            const languageLocations = langMap.get(clickedRow.dataset.language) || [];
+            const features = languageLocations.map(([neighborhood, size]) => {
+                const nData = neighborhoodData.get(neighborhood);
+                if (!nData || !nData.center) return null;
+
+                return {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: nData.center
+                    },
+                    properties: {
+                        size: radiusMap[size],
+                        color: clickedRow.dataset.color
+                    }
+                };
+            }).filter(f => f !== null);
+
+            return features;
         }
 
         // Initial load
