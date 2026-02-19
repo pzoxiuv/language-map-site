@@ -7,8 +7,6 @@
     <title>NYC Language Mapping</title>
     <script src='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css' rel='stylesheet' />
-    <script src="https://cdn.plot.ly/plotly-3.3.0.min.js"></script>
-    <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script>
 
     <script id="region-data" type="application/json">
         {
@@ -153,6 +151,56 @@
             display: none;
         }
 
+        .help {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: fit-content;
+            /* width: 400px; */
+            font-size: 12px;
+            /* transform: translate(-50%, -50%); */
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            border-radius: 8px;
+            z-index: 1000;
+            display: none;
+        }
+
+        #close-help-button {
+            width: 18px;
+            font-size: 16pt;
+            margin-top: 1px;
+            margin-right: 2px;
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        #open-help-button {
+            background-color: rgba(0, 0, 0, 0.7);
+            font-size: 24px !important;
+            color: white;
+
+            margin-top: 2px;
+            margin-right: 2px;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+
+            display: grid;
+            place-items: center;
+
+            border-radius: 8px;
+            z-index: 1000;
+        }
+
         .population-bar {
             height: 15px;
             margin-right: 10px;
@@ -194,6 +242,17 @@
         .maplibregl-ctrl-bottom-right {
             bottom: 20px;
             right: 20px;
+            display: none;
+        }
+
+        #credits {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            width: 100%;
+
+            font-size: 10px;
+            /* text-align: center; */
         }
     </style>
 </head>
@@ -212,10 +271,46 @@
         <div class="map-container">
             <div id="map"></div>
             <div class="loading" id="loading">Loading...</div>
+            <div id="open-help-button" onclick="showHelp();">?</div>
+            <div class="help" id="help">
+                <div id="close-help-button" onclick="closeHelp();"><b>&#10060;</b></div>
+                <ul>
+                    <li>Click a region name to highlight languages from that region</li>
+                    <li>Hover over the map to see neighborhood names</li>
+                    <li>Click a neighborhood to see all languages in that neighborhood</li>
+                    <li>Click on a language from the neighborhood list to see all<br />
+                        neighborhoods where that language is present. The size<br />
+                        of the language's marker in a neighborhood indicates its<br />
+                        population relative to other languages in the
+                        neighborhood</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="credits">
+            Language data from the <a href="https://www.elalliance.org/">Endangered Language Alliance</a> |
+            NYC neighborhood boundaries from <a href="https://data.cityofnewyork.us/d/9nt8-h7nd">NYC Open Data</a>
         </div>
     </div>
 
     <script>
+        function showHelp() {
+            const helpDiv = document.getElementById("help");
+            const helpButton = document.getElementById("open-help-button");
+
+            helpDiv.style.display = "block";
+            helpButton.style.display = "none";
+        }
+
+        function closeHelp() {
+            const helpDiv = document.getElementById("help");
+            const helpButton = document.getElementById("open-help-button");
+
+            helpDiv.style.display = "none";
+            helpButton.style.display = "grid";
+        }
+
+
         // Initialize MapLibre GL JS map
         const map = new maplibregl.Map({
             container: 'map',
@@ -234,7 +329,7 @@
                 // glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
             },
             center: [-74.0060, 40.7128],
-            zoom: 10,
+            zoom: 10.5,
             attributionControl: false
         });
 
@@ -716,6 +811,14 @@
                         document.querySelectorAll('.legend-text').forEach(d => {
                             d.innerHTML = `${d.parentNode.dataset.region}`;
                         });
+
+                        const legendItems = document.getElementsByClassName("legend-item");
+                        let itemToggled = false;
+                        for (const item of legendItems) {
+                            if (item.dataset.toggled) {
+                                itemToggled = true;
+                            }
+                        }
 
                         if (toggled) {
                             item.querySelector('.legend-color').style.borderWidth = "3px";
