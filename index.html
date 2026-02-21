@@ -62,65 +62,156 @@
             height: 100vh;
         }
 
-        .sidebar {
-            position: fixed;
-            left: 20px;
-            top: 175px;
-            width: 600px;
-            padding: 20px;
-            overflow-y: auto;
-            z-index: 9999;
-            height: 90vh;
-            padding-bottom: 20px;
+        /* mobile settings: */
+        @media screen and (max-width: 767px) {
+            .legend {
+                display: flex;
+                gap: 10px;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 9999;
+            }
+
+            .sidebar {
+                position: absolute;
+                left: 10px;
+                top: 100px;
+                width: 25%;
+                /* padding: 20px; */
+                /* overflow-y: auto; */
+                z-index: 9999;
+                /* height: 90vh; */
+                /* padding-bottom: 5px; */
+                /* background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                border-radius: 8px; */
+                font-size: 0.40em;
+            }
+
+            .circle-container {
+                display: flex;
+                justify-content: center;
+                height: 5px;
+                align-items: center;
+            }
+
+            .sidebar h1 {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+                color: #ecf0f1;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                /* margin-left: 3px; */
+                margin-bottom: 3px;
+                font-size: 0.40em;
+                cursor: pointer;
+            }
+
+            .legend-color {
+                width: 7px;
+                height: 7px;
+                margin-right: 5px;
+                border: 1px solid #000;
+            }
+
+            .language-list {
+                display: flex;
+                align-items: center;
+                margin-bottom: 2px;
+                font-size: 0.85em;
+            }
+
+            #credits {
+                position: absolute;
+                bottom: 5px;
+                left: 5px;
+                width: 100%;
+
+                font-size: 7px;
+                /* text-align: center; */
+            }
         }
 
-        .sidebar h1 {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-            color: #ecf0f1;
+        @media screen and (min-width: 768px) {
+            /* .legend h3 {
+                font-size: 1em;
+                margin-bottom: 10px;
+            } */
+
+            .sidebar {
+                position: absolute;
+                left: 20px;
+                top: 175px;
+                /* width: 600px; */
+                padding: 20px;
+                /* overflow-y: auto; */
+                z-index: 9999;
+                height: 90vh;
+                padding-bottom: 20px;
+                /* background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                border-radius: 8px; */
+            }
+
+            .sidebar h1 {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+                color: #ecf0f1;
+            }
+
+            .circle-container {
+                display: flex;
+                justify-content: center;
+                height: 25px;
+                align-items: center;
+            }
+
+            .legend {
+                display: flex;
+                gap: 20px;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 9999;
+            }
+
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 5px;
+                font-size: 0.85em;
+                cursor: pointer;
+            }
+
+            .legend-color {
+                width: 20px;
+                height: 20px;
+                margin-right: 10px;
+                border: 1px solid #000;
+            }
+
+            .language-list {
+                display: flex;
+                align-items: center;
+                margin-bottom: 5px;
+                font-size: 0.85em;
+            }
+
+            #credits {
+                position: absolute;
+                bottom: 5px;
+                left: 5px;
+                width: 100%;
+
+                font-size: 10px;
+                /* text-align: center; */
+            }
         }
 
-        .legend {
-            margin-top: 20px;
-            padding-top: 20px;
-            display: flex;
-            gap: 20px;
-            position: fixed;
-            top: 0;
-            left: 20px;
-            z-index: 9999;
-        }
-
-        .column {
-            flex: 1;
-        }
-
-        .legend h3 {
-            font-size: 1em;
-            margin-bottom: 10px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            font-size: 0.85em;
-            cursor: pointer;
-        }
-
-        .language-list {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            font-size: 0.85em;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            margin-right: 10px;
-            border: 1px solid #000;
-        }
 
         .map-container {
             flex: 1;
@@ -201,29 +292,9 @@
             z-index: 1000;
         }
 
-        .population-bar {
-            height: 15px;
-            margin-right: 10px;
-            border: 1px solid #34495e;
-            position: relative;
-        }
-
-        .chart-container {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #34495e;
-        }
-
         #population-chart {
             width: 100%;
             height: 400px;
-        }
-
-        .circle-container {
-            display: flex;
-            justify-content: center;
-            height: 25px;
-            align-items: center;
         }
 
         .circle {
@@ -243,16 +314,6 @@
             bottom: 20px;
             right: 20px;
             display: none;
-        }
-
-        #credits {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            width: 100%;
-
-            font-size: 10px;
-            /* text-align: center; */
         }
     </style>
 </head>
@@ -401,8 +462,16 @@
             const circle = document.createElement('div');
             circle.className = 'circle';
             circle.style.backgroundColor = color;
+
             circle.style.width = `${sizeMap[s]}px`;
             circle.style.height = `${sizeMap[s]}px`;
+            if (window.screen.width < 768) {
+                circle.style.width = `${sizeMap[s] / 5}px`;
+                circle.style.height = `${sizeMap[s] / 5}px`;
+            } else {
+                circle.style.width = `${sizeMap[s]}px`;
+                circle.style.height = `${sizeMap[s]}px`;
+            }
 
             const circleContainer = document.createElement('div');
             circleContainer.className = 'circle-container';
